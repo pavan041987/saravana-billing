@@ -435,8 +435,8 @@ function nav(sec){
   render();
 }
 function initNB(b){
-  if(b)S.nb={_eid:b.billId,patient:b.patient,age:b.age||'',gender:b.gender||'Male',phone:b.phone,loc:b.location||'',branch:b.branch,type:b.type,ref:b.referredBy||'',admitD:b.admitDate||'',disD:b.dischargeDate||'',notes:b.notes||'',charges:[...(b.charges||[]).map(c=>({...c}))],meds:[...(b.meds||[]).map(m=>({...m}))],disc:b.discount||0,paid:b.paid,payMode:b.payMode||'Cash',mq:'',mqty:1};
-  else S.nb={_eid:null,patient:'',age:'',gender:'Male',phone:'',loc:'',branch:(CFG.branches||['Guntur'])[0],type:'OP',ref:'',admitD:'',disD:'',notes:'',charges:(DC['OP']||[]).map(c=>({...c})),meds:[],disc:0,paid:'',payMode:'Cash',mq:'',mqty:1};
+  if(b)S.nb={_eid:b.billId,patient:b.patient,age:b.age||'',gender:b.gender||'Male',phone:b.phone,loc:b.location||'',branch:b.branch,type:b.type,ref:b.referredBy||'',admitD:b.admitDate||'',disD:b.dischargeDate||'',notes:b.notes||'',charges:[...(b.charges||[]).map(c=>({...c}))],meds:[...(b.meds||[]).map(m=>({...m}))],disc:b.discount||0,paid:b.paid,payMode:b.payMode||'Cash',mq:'',mqty:1,billDate:b.date||''};
+  else S.nb={_eid:null,patient:'',age:'',gender:'Male',phone:'',loc:'',branch:(CFG.branches||['Guntur'])[0],type:'OP',ref:'',admitD:'',disD:'',notes:'',charges:(DC['OP']||[]).map(c=>({...c})),meds:[],disc:0,paid:'',payMode:'Cash',mq:'',mqty:1,billDate:''};
 }
 
 // ── RENDER ────────────────────────────────────────────────────
@@ -523,6 +523,7 @@ function rDetail(){
         ${b.type==='Inpatient'&&b.status==='Active'?`<button class="btn-gold btn-sm" onclick="doDischarge('${b.billId}')">Discharge</button>`:''}
         <button class="btn-ghost btn-sm" onclick="editB('${b.billId}')">✏ Edit</button>
         <button class="btn-navy btn-sm" onclick="printB('${b.billId}')">🖨 Print</button>
+        <button class="btn-green btn-sm" onclick="newBillSamePatient('${b.billId}')" title="Create another bill for same patient">＋ Same Patient</button>
       </div>
 
       <div class="card" style="margin-bottom:10px">
@@ -625,6 +626,7 @@ function rNB(){
           <div class="g2"><div class="field"><label>Branch</label><select onchange="S.nb.branch=this.value">${(CFG.branches||[]).map(b=>`<option${nb.branch===b?' selected':''}>${b}</option>`).join('')}</select></div><div class="field"><label>Bill Type</label><select onchange="chgType(this.value)">${['OP','Medicine','Inpatient','EEG','Scan','Lab'].map(t=>`<option${nb.type===t?' selected':''}>${t}</option>`).join('')}</select></div></div>
           ${nb.type==='Inpatient'?`<div class="g2"><div class="field"><label>Admit</label><input type="date" value="${nb.admitD}" oninput="S.nb.admitD=this.value"></div><div class="field"><label>Discharge</label><input type="date" value="${nb.disD}" oninput="S.nb.disD=this.value"></div></div>`:''}
           <div class="field"><label>Referred By</label><input value="${nb.ref}" placeholder="Doctor name" oninput="S.nb.ref=this.value"></div>
+          <div class="field"><label>Bill Date <span style="font-size:9px;color:var(--teal2);font-weight:400;text-transform:none">(blank = today)</span></label><input type="date" value="${nb.billDate}" oninput="S.nb.billDate=this.value"></div>
           <div class="field"><label>Notes</label><textarea rows="2" style="resize:none" oninput="S.nb.notes=this.value">${nb.notes}</textarea></div>
         </div>
         <div class="card">
@@ -675,6 +677,7 @@ function rNB(){
       <div class="field"><label>Bill Type</label><select onchange="chgType(this.value)">${['OP','Medicine','Inpatient','EEG','Scan','Lab'].map(t=>`<option${nb.type===t?' selected':''}>${t}</option>`).join('')}</select></div>
       ${nb.type==='Inpatient'?`<div class="g2"><div class="field"><label>Admit</label><input type="date" value="${nb.admitD}" oninput="S.nb.admitD=this.value"></div><div class="field"><label>Discharge</label><input type="date" value="${nb.disD}" oninput="S.nb.disD=this.value"></div></div>`:''}
       <div class="field"><label>Referred By</label><input value="${nb.ref}" placeholder="Doctor name" oninput="S.nb.ref=this.value"></div>
+      <div class="field"><label>Bill Date <span style="font-size:9px;color:var(--teal2);font-weight:400;text-transform:none">(leave blank = today)</span></label><input type="date" value="${nb.billDate}" oninput="S.nb.billDate=this.value" placeholder="Leave blank for today"></div>
       <div class="field"><label>Notes</label><textarea rows="2" style="resize:none" oninput="S.nb.notes=this.value">${nb.notes}</textarea></div>
       <div class="sep"></div>
       <div class="field"><label>Discount (₹)</label><input type="number" value="${nb.disc}" placeholder="0" oninput="S.nb.disc=this.value;updSum()"></div>
@@ -718,6 +721,26 @@ function rAC(){const q=S.nb.mq;const el=document.getElementById('mac');if(!el||!
 function selMed(id){const m=MEDS.find(x=>x.medId===id);if(!m)return;const q=S.nb.mqty||1;const ex=S.nb.meds.findIndex(x=>x.name===m.name);if(ex>=0)S.nb.meds[ex].qty+=q;else S.nb.meds.push({name:m.name,price:m.price,unit:m.unit,qty:q});S.nb.mq='';S.nb.mqty=1;render();}
 function addMed(){const q=S.nb.mq?.trim()||'';if(!q)return;const ex=MEDS.find(m=>(m.name||'').toLowerCase()===q.toLowerCase()||(m.brand||'').toLowerCase()===q.toLowerCase());if(ex){selMed(ex.medId);return;}const p=MEDS.filter(m=>(m.name||'').toLowerCase().includes(q.toLowerCase()));if(p.length===1){selMed(p[0].medId);return;}if(p.length>1){rAC();return;}document.getElementById('mm-n').value=q;document.getElementById('mm-b').value=q;document.getElementById('mm-c').value='';document.getElementById('mm-p').value='';document.getElementById('mm-e').value='';document.getElementById('modal-nm').classList.add('open');}
 async function saveNewMed(){const n=document.getElementById('mm-n').value.trim();const br=document.getElementById('mm-b').value.trim()||n;const c=document.getElementById('mm-c').value.trim()||'General';const u=document.getElementById('mm-u').value;const p=parseFloat(document.getElementById('mm-p').value);const e=document.getElementById('mm-e').value;if(!n||!p){toast('Name and price required','err');return;}const r=await api('POST','/api/meds',{name:n,brand:br,category:c,price:p,unit:u,expiry:e||''});if(r.medId){MEDS.push(r);S.nb.meds.push({name:n,price:p,unit:u,qty:S.nb.mqty||1});S.nb.mq='';S.nb.mqty=1;closeModal('modal-nm');toast(`"${n}" saved at ${R(p)}/${u}`);render();}else toast('Error saving medicine','err');}
+function newBillSamePatient(id){
+  // Copy patient details from existing bill, clear charges/meds/payment
+  const b=BILLS.find(x=>x.billId===id);if(!b)return;
+  S.nb={
+    _eid:null,
+    patient:b.patient, age:b.age||'', gender:b.gender||'Male',
+    phone:b.phone, loc:b.location||'',
+    branch:b.branch, type:'OP',
+    ref:b.referredBy||'', admitD:'', disD:'', notes:'',
+    charges:(DC['OP']||[]).map(c=>({...c})),
+    meds:[], disc:0, paid:'', payMode:'Cash',
+    mq:'', mqty:1, billDate:''
+  };
+  S.sec='newbill'; S.bid=null;
+  document.querySelectorAll('.nb').forEach((btn,i)=>{const m=['dash','newbill','meds','ip','reports','_','settings','_'];btn.classList.toggle('active',m[i]==='newbill');});
+  document.querySelectorAll('.bn-btn').forEach((btn,i)=>{const m=['dash','newbill','meds','ip','reports'];btn.classList.toggle('active',m[i]==='newbill');});
+  render();
+  toast(`New bill started for ${b.patient}`);
+}
+
 async function saveB(){
   const nb=S.nb;
   if(!nb.patient?.trim()){toast('Patient name required','err');return;}
@@ -725,7 +748,9 @@ async function saveB(){
   const total=Math.max(0,cC(nb.charges)+cM(nb.meds)-Number(nb.disc||0));
   const paid=Math.min(total,Number(nb.paid||0));
   const status=paid>=total?(nb.type==='Inpatient'?'Discharged':'Paid'):(paid>0?'Partial':(nb.type==='Inpatient'?'Active':'Pending'));
-  const payload={patient:nb.patient,age:nb.age,gender:nb.gender,phone:nb.phone,location:nb.loc,branch:nb.branch,type:nb.type,referredBy:nb.ref,admitDate:nb.admitD,dischargeDate:nb.disD,notes:nb.notes,charges:nb.charges,meds:nb.meds,discount:Number(nb.disc||0),total,paid,payMode:nb.payMode,status};
+  // Use manual date if provided, else today
+  const billDate = nb.billDate ? new Date(nb.billDate).toLocaleDateString('en-IN') : toDay();
+  const payload={patient:nb.patient,age:nb.age,gender:nb.gender,phone:nb.phone,location:nb.loc,branch:nb.branch,type:nb.type,referredBy:nb.ref,admitDate:nb.admitD,dischargeDate:nb.disD,notes:nb.notes,charges:nb.charges,meds:nb.meds,discount:Number(nb.disc||0),total,paid,payMode:nb.payMode,status,date:billDate};
   if(nb._eid){
     const r=await api('PUT',`/api/bills/${nb._eid}`,payload);
     if(r._id||r.billId){const i=BILLS.findIndex(b=>b.billId===nb._eid);if(i>=0)BILLS[i]={...BILLS[i],...payload};toast(`Bill ${nb._eid} updated`);S.bid=nb._eid;S.sec='dash';render();}

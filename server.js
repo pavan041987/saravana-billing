@@ -201,7 +201,7 @@ app.post('/api/bills', requireLogin, async (req, res) => {
     const cfg = await Config.findOne({ key: 'hospitalConfig' });
     const prefix = cfg?.value?.prefix || 'SRVN';
     const billId = `${prefix}-${String(ctr.value).padStart(3, '0')}`;
-    const today = new Date().toLocaleDateString('en-IN');
+    const today = req.body.date || new Date().toLocaleDateString('en-IN');
     const bill = await Bill.create({ ...req.body, billId, date: today, createdBy: req.session.username });
     res.json(bill);
   } catch (e) { res.status(500).json({ error: e.message }); }
